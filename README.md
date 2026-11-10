@@ -4,14 +4,14 @@ Machine learning project for PureDrop Dairy: forecasting milk selling prices
 end to end (data, model, FastAPI deployment).
 
 ## Status
-**Task 1 of 6:** repo setup, data acquisition and exploratory analysis. (done)
+**Task 4 of 6:** model comparison and selection. (Tasks 1-3 done)
 
 | # | Task | Status |
 |---|------|--------|
 | 1 | Repo, data, initial notebook | Done |
-| 2 | Baseline linear regression | Planned |
-| 3 | Time-series feature engineering | Planned |
-| 4 | Compare advanced regressors | Planned |
+| 2 | Baseline linear regression | Done |
+| 3 | Time-series feature engineering | Done |
+| 4 | Compare advanced regressors | Done |
 | 5 | FastAPI service + free deployment | Planned |
 | 6 | Model card and hand-over | Planned |
 
@@ -23,10 +23,16 @@ pure-drop-milk-price/
 ├── .gitignore
 ├── data/
 │   └── milk_prices.csv        # clean copy: columns date, price
+├── models/
+│   ├── best_model.pkl         # selected model + feature list
+│   └── model_comparison.csv   # CV and test scores for all models
 ├── scripts/
 │   └── download_data.py       # fetches data and saves the CSV
 └── notebooks/
-    └── 01_eda.ipynb           # summary stats + price-over-time plots
+    ├── 01_eda.ipynb           # summary stats + price-over-time plots
+    ├── 02_baseline_model.ipynb  # baseline linear regression + evaluation
+    ├── 03_time_series_features.ipynb  # calendar, seasonality, lag, rolling features
+    └── 04_model_comparison.ipynb      # compare regressors, save best model
 ```
 
 ## How to run
@@ -42,6 +48,52 @@ jupyter notebook notebooks/01_eda.ipynb
 - Shape, column types and missing values
 - Summary statistics (count, mean, std, min, quartiles, max, skewness) and date range
 - Line chart of daily price over time, plus a monthly-average chart
+
+## Baseline model results (Task 2)
+Chronological 80/20 split (no shuffling), feature: days since start.
+
+| Metric | Value |
+|--------|-------|
+| MAE | 0.0265 |
+| RMSE | 0.0307 |
+| R2 | -0.2796 |
+
+The baseline beats a naive "predict the training mean" model on MAE (0.0265 vs
+0.0527), but R2 is negative: a straight line cannot capture the yearly
+seasonality in the data. Task 3 adds time-series features to fix this.
+
+## Feature engineering results (Task 3)
+Same linear regression, same chronological 80/20 split; only the features change.
+
+| Feature set | MAE | RMSE | R2 |
+|-------------|-----|------|----|
+| Baseline (day_num) | 0.0267 | 0.0309 | -0.3161 |
+| + Calendar | 0.0180 | 0.0214 | 0.3693 |
+| + Seasonality (sin/cos) | 0.0081 | 0.0102 | 0.8570 |
+| + Lags | 0.0081 | 0.0102 | 0.8568 |
+| All features | 0.0082 | 0.0103 | 0.8541 |
+
+Seasonality features gave almost all of the improvement. Lag and rolling
+features did not help on this synthetic data (noise is independent day to
+day); they should be re-tested on real data. Engineered data is saved to
+`data/milk_features.csv` for Task 4.
+
+## Model comparison (Task 4)
+Selection by 5-fold `TimeSeriesSplit` cross-validation on the training period only;
+test scores reported once afterwards.
+
+| Model | CV RMSE | Test MAE | Test RMSE | Test R2 |
+|-------|---------|----------|-----------|---------|
+| **Ridge (selected)** | 0.0136 | 0.0081 | 0.0103 | 0.8552 |
+| Random Forest | 0.0177 | 0.0127 | 0.0158 | 0.6575 |
+| Gradient Boosting | 0.0190 | 0.0135 | 0.0168 | 0.6139 |
+| Linear Regression | 0.0201 | 0.0082 | 0.0103 | 0.8541 |
+| HistGradientBoosting | 0.0226 | 0.0128 | 0.0160 | 0.6474 |
+
+Ridge was selected on cross-validation; on the test period it is essentially tied
+with plain Linear Regression. Tree-based models did worse because they cannot
+extrapolate the upward price trend beyond the range seen in training. Results
+come from synthetic data and should be re-checked on real data.
 
 ## Data note (important)
 The UCI "Milk Production" page linked in the brief is an HTML page, not a
