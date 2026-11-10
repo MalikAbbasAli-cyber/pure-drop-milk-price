@@ -4,7 +4,7 @@ Machine learning project for PureDrop Dairy: forecasting milk selling prices
 end to end (data, model, FastAPI deployment).
 
 ## Status
-**Task 4 of 6:** model comparison and selection. (Tasks 1-3 done)
+**Task 5 of 6:** FastAPI service and deployment. (Tasks 1-4 done)
 
 | # | Task | Status |
 |---|------|--------|
@@ -12,7 +12,7 @@ end to end (data, model, FastAPI deployment).
 | 2 | Baseline linear regression | Done |
 | 3 | Time-series feature engineering | Done |
 | 4 | Compare advanced regressors | Done |
-| 5 | FastAPI service + free deployment | Planned |
+| 5 | FastAPI service + free deployment | Done (live URL below) |
 | 6 | Model card and hand-over | Planned |
 
 ## Project structure
@@ -23,6 +23,12 @@ pure-drop-milk-price/
 ├── .gitignore
 ├── data/
 │   └── milk_prices.csv        # clean copy: columns date, price
+├── app/
+│   └── main.py                # FastAPI service (/health, /predict)
+├── tests/
+│   └── test_api.py            # API tests
+├── requirements-api.txt       # minimal deps for deployment
+├── render.yaml                # Render deployment config
 ├── models/
 │   ├── best_model.pkl         # selected model + feature list
 │   └── model_comparison.csv   # CV and test scores for all models
@@ -94,6 +100,39 @@ Ridge was selected on cross-validation; on the test period it is essentially tie
 with plain Linear Regression. Tree-based models did worse because they cannot
 extrapolate the upward price trend beyond the range seen in training. Results
 come from synthetic data and should be re-checked on real data.
+
+## API (Task 5)
+
+Run locally:
+```bash
+pip install -r requirements-api.txt
+uvicorn app.main:app --reload
+```
+Open http://127.0.0.1:8000/docs for the interactive docs.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Service and model status |
+| `POST /predict` | Forecast the price for one date |
+
+`POST /predict` body:
+```json
+{
+  "date": "2026-11-01",
+  "recent_prices": [0.62, 0.63, "... at least 30 daily prices, oldest first, ending the day before `date`"]
+}
+```
+Response:
+```json
+{"date": "2026-11-01", "predicted_price": 0.6205, "model": "Ridge"}
+```
+The model uses lag and rolling-average features, so the caller supplies the
+last 30 daily prices; the service builds the same features as the training
+notebook. Fewer than 30 prices returns HTTP 422.
+
+Example client: `python scripts/example_request.py [base_url]`. Tests: `pytest -q`.
+
+**Live URL:** _add your Render URL here after deploying_
 
 ## Data note (important)
 The UCI "Milk Production" page linked in the brief is an HTML page, not a
