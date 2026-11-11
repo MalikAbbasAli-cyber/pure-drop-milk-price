@@ -4,7 +4,7 @@ Machine learning project for PureDrop Dairy: forecasting milk selling prices
 end to end (data, model, FastAPI deployment).
 
 ## Status
-**Task 5 of 6:** FastAPI service and deployment. (Tasks 1-4 done)
+**All 6 tasks complete.** Live API: https://pure-drop-milk-price.onrender.com
 
 | # | Task | Status |
 |---|------|--------|
@@ -12,8 +12,13 @@ end to end (data, model, FastAPI deployment).
 | 2 | Baseline linear regression | Done |
 | 3 | Time-series feature engineering | Done |
 | 4 | Compare advanced regressors | Done |
-| 5 | FastAPI service + free deployment | Done (live URL below) |
-| 6 | Model card and hand-over | Planned |
+| 5 | FastAPI service + free deployment | Done |
+| 6 | Model card and hand-over | Done |
+
+## Documentation
+- [Model card](docs/MODEL_CARD.md): what the model is, how it was evaluated, and its limits
+- [Usage guide](docs/USAGE_GUIDE.md): how to call the API, run locally, and retrain
+- [Hand-over](docs/HANDOVER.md): what is delivered, what PureDrop must do next
 
 ## Project structure
 ```
@@ -132,7 +137,10 @@ notebook. Fewer than 30 prices returns HTTP 422.
 
 Example client: `python scripts/example_request.py [base_url]`. Tests: `pytest -q`.
 
-**Live URL:** _add your Render URL here after deploying_
+**Live URL:** https://pure-drop-milk-price.onrender.com (interactive docs at `/docs`)
+
+The free Render plan puts the service to sleep after a period of inactivity, so the
+first request after a quiet spell can take 30-60 seconds.
 
 ## Data note (important)
 The UCI "Milk Production" page linked in the brief is an HTML page, not a
@@ -148,4 +156,4 @@ pipeline runs end to end, and can be replaced with PureDrop's real sales
 history (same two columns: `date`, `price`) without changing the notebook.
 
 ## Author
-Malik Abbas Ali. Ezitech internship, Task 1.
+Malik Abbas Ali. Ezitech internship, PureDrop Dairy project (Tasks 1-6).
