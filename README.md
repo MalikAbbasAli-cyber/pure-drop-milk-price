@@ -27,7 +27,8 @@ pure-drop-milk-price/
 ├── requirements.txt
 ├── .gitignore
 ├── data/
-│   └── milk_prices.csv        # clean copy: columns date, price
+│   ├── milk_prices.csv        # clean copy: columns date, price
+│   └── milk_prices_fe.csv     # Task 3: with lag_1, ma_7, day_of_week, month
 ├── app/
 │   └── main.py                # FastAPI service (/health, /predict)
 ├── tests/
@@ -35,10 +36,15 @@ pure-drop-milk-price/
 ├── requirements-api.txt       # minimal deps for deployment
 ├── render.yaml                # Render deployment config
 ├── models/
+│   ├── model_baseline.pkl     # Task 2 baseline (linear regression)
+│   ├── model_fe.pkl           # Task 3 feature-engineered model
 │   ├── best_model.pkl         # selected model + feature list
 │   └── model_comparison.csv   # CV and test scores for all models
 ├── scripts/
-│   └── download_data.py       # fetches data and saves the CSV
+│   ├── download_data.py       # fetches data and saves the CSV
+│   ├── train_baseline.py      # trains and saves the baseline, prints RMSE
+│   ├── feature_engineering.py # adds features, trains model_fe.pkl, compares RMSE
+│   └── example_request.py     # sample API client
 └── notebooks/
     ├── 01_eda.ipynb           # summary stats + price-over-time plots
     ├── 02_baseline_model.ipynb  # baseline linear regression + evaluation
@@ -69,25 +75,51 @@ Chronological 80/20 split (no shuffling), feature: days since start.
 | RMSE | 0.0307 |
 | R2 | -0.2796 |
 
+**Test RMSE: 0.0307**
+
+**Reproduce it:** `python scripts/train_baseline.py` loads the cleaned CSV, splits it 80/20
+with `train_test_split`, trains a `LinearRegression`, prints the scores above, and saves
+the model with joblib to `models/model_baseline.pkl`. The split uses `shuffle=False`
+(oldest 80% of days train, newest 20% test) with a fixed `random_state=42`, so it is
+identical on every run. It is not shuffled because this is time-series data: a random
+split would let the model learn from future prices.
+
 The baseline beats a naive "predict the training mean" model on MAE (0.0265 vs
 0.0527), but R2 is negative: a straight line cannot capture the yearly
 seasonality in the data. Task 3 adds time-series features to fix this.
 
 ## Feature engineering results (Task 3)
-Same linear regression, same chronological 80/20 split; only the features change.
+`python scripts/feature_engineering.py` adds four columns to the data, trains a new
+`LinearRegression` and saves it with joblib to `models/model_fe.pkl`.
 
-| Feature set | MAE | RMSE | R2 |
-|-------------|-----|------|----|
-| Baseline (day_num) | 0.0267 | 0.0309 | -0.3161 |
-| + Calendar | 0.0180 | 0.0214 | 0.3693 |
-| + Seasonality (sin/cos) | 0.0081 | 0.0102 | 0.8570 |
-| + Lags | 0.0081 | 0.0102 | 0.8568 |
-| All features | 0.0082 | 0.0103 | 0.8541 |
+| New column | Meaning |
+|------------|---------|
+| `lag_1` | price on the previous day |
+| `ma_7` | average price of the previous 7 days |
+| `day_of_week` | 0 = Monday ... 6 = Sunday |
+| `month` | month number 1-12 |
 
-Seasonality features gave almost all of the improvement. Lag and rolling
-features did not help on this synthetic data (noise is independent day to
-day); they should be re-tested on real data. Engineered data is saved to
-`data/milk_features.csv` for Task 4.
+`ma_7` is computed from the *previous* 7 days only, so today's price is never used to
+predict today's price. The first 7 rows have no history and are dropped (1765 -> 1758
+rows). The enriched data is saved to `data/milk_prices_fe.csv`. Same 80/20
+`train_test_split` as Task 2 (`shuffle=False`, `random_state=42`); both models are scored
+on the **same** 352 test rows.
+
+| Model | MAE | RMSE | R2 |
+|-------|-----|------|----|
+| Baseline (`day_num` only) | 0.0265 | 0.0308 | -0.2962 |
+| **Feature model (`model_fe.pkl`)** | **0.0088** | **0.0111** | **0.8303** |
+
+**Test RMSE fell from 0.0308 to 0.0111 (about 64% lower).** (Task 2 reported 0.0307
+because dropping the first 7 rows changes the test set by one day.) The biggest gain
+comes from `ma_7`, which gives the model the recent price level, so it can follow the
+yearly seasonal wave that a straight line cannot. Scores are one-step-ahead forecasts
+(real previous prices are used as inputs) on synthetic data.
+
+**Further exploration** (`notebooks/03_time_series_features.ipynb`) tried other feature
+sets on the same data: adding smooth seasonality terms (sin/cos of the day of year) gave
+an RMSE of about 0.0102, and extra lag and rolling features did not improve on that. The
+enriched file from that notebook (`data/milk_features.csv`) is used in Task 4.
 
 ## Model comparison (Task 4)
 Selection by 5-fold `TimeSeriesSplit` cross-validation on the training period only;
